@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio-dev
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: minio123456
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_dev_data:/data
+    networks:
+      - doc-review-dev-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: doc-review-backend-dev
+    ports:
+      - "3001:3001"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - PORT=3001
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=admin
+      - MINIO_SECRET_KEY=minio123456
+      - MINIO_BUCKET_NAME=pdf-documents
+      - MINIO_SECURE=false
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - doc-review-dev-network
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
+volumes:
+  minio_dev_data:
+
+networks:
+  doc-review-dev-network:
+    driver: bridge
+
